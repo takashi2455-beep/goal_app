@@ -259,6 +259,10 @@ function bucketItemHtml(item) {
 }
 
 function subitemRowHtml(s) {
+  const monthLabel = s.deadline_year && s.deadline_month
+    ? `<span class="sub-month-label">${s.deadline_year}年${s.deadline_month}月</span>`
+    : s.deadline_year
+    ? `<span class="sub-month-label">${s.deadline_year}年</span>` : '';
   const weekLabel = s.deadline_week
     ? `<span class="sub-week-label">${s.deadline_week}</span>` : '';
   const dateLabel = s.deadline_date
@@ -274,7 +278,7 @@ function subitemRowHtml(s) {
     <div class="chk${s.completed ? ' on' : ''}" onclick="toggleSubitem(${s.id})"></div>
     <div class="subitem-body">
       <span class="subitem-title${s.completed ? ' done' : ''}">${esc(s.title)}</span>
-      ${weekLabel}${dateLabel}${timeLabel}
+      ${monthLabel}${weekLabel}${dateLabel}${timeLabel}
     </div>
     <span class="edit-arrow" onclick="editSubitem(${s.id})">›</span>
   </div>`;

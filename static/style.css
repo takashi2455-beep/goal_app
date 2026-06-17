@@ -605,6 +605,16 @@ body {
 }
 .subitem-title.done { text-decoration: line-through; color: var(--text-muted); }
 
+.sub-month-label {
+  font-size: 11px;
+  background: #F3E8FF;
+  color: #7C3AED;
+  padding: 2px 7px;
+  border-radius: 20px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
 .sub-week-label {
   font-size: 11px;
   background: #EBF5FF;
