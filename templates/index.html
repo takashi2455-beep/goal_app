@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>目標管理</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<div id="app">
+
+  <!-- Header -->
+  <header class="header">
+    <h1>目標管理</h1>
+    <div style="position:relative">
+      <button class="btn-icon" id="export-btn" onclick="toggleExportMenu()">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+          <polyline points="7 10 12 15 17 10"/>
+          <line x1="12" y1="15" x2="12" y2="3"/>
+        </svg>
+      </button>
+      <div id="export-menu" class="dropdown hidden">
+        <button onclick="exportFile('text')">
+          <span class="menu-icon">📄</span> テキスト (.txt)
+        </button>
+        <button onclick="exportFile('csv')">
+          <span class="menu-icon">📊</span> CSV (.csv)
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Tabs -->
+  <nav class="tabs">
+    <button class="tab active" data-tab="bucket" onclick="switchTab('bucket')">やりたいこと</button>
+    <button class="tab" data-tab="monthly" onclick="switchTab('monthly')">月</button>
+    <button class="tab" data-tab="weekly" onclick="switchTab('weekly')">週</button>
+    <button class="tab" data-tab="daily" onclick="switchTab('daily')">日</button>
+  </nav>
+
+  <!-- やりたいことリスト -->
+  <div id="tab-bucket" class="tab-content active">
+    <div class="list-wrap">
+      <div id="bucket-list" class="task-list"></div>
+    </div>
+  </div>
+
+  <!-- 月次 -->
+  <div id="tab-monthly" class="tab-content">
+    <div class="date-nav">
+      <button onclick="changeMonth(-1)">&#9664;</button>
+      <span id="monthly-label"></span>
+      <button onclick="changeMonth(1)">&#9654;</button>
+    </div>
+    <div class="list-wrap">
+      <div id="monthly-list" class="task-list"></div>
+    </div>
+  </div>
+
+  <!-- 週次 -->
+  <div id="tab-weekly" class="tab-content">
+    <div class="date-nav">
+      <button onclick="changeWeek(-1)">&#9664;</button>
+      <span id="weekly-label"></span>
+      <button onclick="changeWeek(1)">&#9654;</button>
+    </div>
+    <div class="list-wrap">
+      <div id="weekly-list" class="task-list"></div>
+    </div>
+  </div>
+
+  <!-- 日次 -->
+  <div id="tab-daily" class="tab-content">
+    <div class="date-nav">
+      <button onclick="changeDay(-1)">&#9664;</button>
+      <span id="daily-label"></span>
+      <button onclick="changeDay(1)">&#9654;</button>
+    </div>
+    <div id="daily-progress" class="progress-area hidden">
+      <div class="progress-bar-wrap"><div id="progress-bar" class="progress-bar"></div></div>
+      <div id="progress-text" class="progress-text"></div>
+    </div>
+    <div class="list-wrap">
+      <div id="daily-list" class="task-list"></div>
+    </div>
+  </div>
+
+  <!-- FAB -->
+  <button class="fab" onclick="showAddModal()" title="追加">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+      <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+    </svg>
+  </button>
+
+  <!-- Add Modal -->
+  <div id="add-overlay" class="overlay hidden" onclick="closeAddModal()">
+    <div class="modal" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <h2 id="add-title">追加</h2>
+        <button class="btn-close" onclick="closeAddModal()">&#10005;</button>
+      </div>
+      <div class="modal-body">
+        <input id="inp-title" type="text" placeholder="タイトル *" autocomplete="off">
+        <!-- bucket-only fields -->
+        <textarea id="inp-desc" placeholder="説明（オプション）" rows="2"></textarea>
+        <select id="inp-cat">
+          <option value="must">must</option>
+          <option value="読みたい本">読みたい本</option>
+          <option value="読みたい教科書">読みたい教科書</option>
+          <option value="趣味">趣味</option>
+          <option value="投資">投資</option>
+        </select>
+        <div class="deadline-row">
+          <input id="inp-year" type="number" min="2020" max="2099" value="2026" placeholder="年">
+          <select id="inp-month">
+            <option value="">月（任意）</option>
+            <option value="1">1月</option><option value="2">2月</option>
+            <option value="3">3月</option><option value="4">4月</option>
+            <option value="5">5月</option><option value="6">6月</option>
+            <option value="7">7月</option><option value="8">8月</option>
+            <option value="9">9月</option><option value="10">10月</option>
+            <option value="11">11月</option><option value="12">12月</option>
+          </select>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" onclick="closeAddModal()">キャンセル</button>
+        <button class="btn-primary" onclick="saveAdd()">追加</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Edit Modal -->
+  <div id="edit-overlay" class="overlay hidden" onclick="closeEditModal()">
+    <div class="modal" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <h2>編集</h2>
+        <button class="btn-close" onclick="closeEditModal()">&#10005;</button>
+      </div>
+      <div class="modal-body">
+        <input id="edit-title" type="text" placeholder="タイトル *" autocomplete="off">
+        <!-- bucket-only fields -->
+        <textarea id="edit-desc" placeholder="説明（オプション）" rows="2"></textarea>
+        <select id="edit-cat">
+          <option value="must">must</option>
+          <option value="読みたい本">読みたい本</option>
+          <option value="読みたい教科書">読みたい教科書</option>
+          <option value="趣味">趣味</option>
+          <option value="投資">投資</option>
+        </select>
+        <div class="deadline-row">
+          <input id="edit-year" type="number" min="2020" max="2099" value="2026" placeholder="年">
+          <select id="edit-month">
+            <option value="">月（任意）</option>
+            <option value="1">1月</option><option value="2">2月</option>
+            <option value="3">3月</option><option value="4">4月</option>
+            <option value="5">5月</option><option value="6">6月</option>
+            <option value="7">7月</option><option value="8">8月</option>
+            <option value="9">9月</option><option value="10">10月</option>
+            <option value="11">11月</option><option value="12">12月</option>
+          </select>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-danger" onclick="confirmDelete()">削除</button>
+        <div style="margin-left:auto;display:flex;gap:8px">
+          <button class="btn-secondary" onclick="closeEditModal()">キャンセル</button>
+          <button class="btn-primary" onclick="saveEdit()">保存</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Time Spent Modal -->
+  <div id="time-overlay" class="overlay hidden" onclick="closeTimeModal()">
+    <div class="modal" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <h2>⏱ かかった時間</h2>
+        <button class="btn-close" onclick="closeTimeModal()">&#10005;</button>
+      </div>
+      <div class="modal-body">
+        <p id="time-modal-item-name" class="time-modal-label"></p>
+        <input id="time-inp" type="text" placeholder="分で入力（例: 90）" autocomplete="off">
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" onclick="closeTimeModal()">スキップ</button>
+        <button class="btn-primary" onclick="saveTimeSpent()">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Subitem Modal -->
+  <div id="subitem-overlay" class="overlay hidden" onclick="closeSubitemModal()">
+    <div class="modal" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <h2 id="subitem-title">サブ項目追加</h2>
+        <button class="btn-close" onclick="closeSubitemModal()">&#10005;</button>
+      </div>
+      <div class="modal-body">
+        <input id="sub-inp-title" type="text" placeholder="タイトル *" autocomplete="off">
+        <div class="deadline-row">
+          <input id="sub-inp-year" type="number" min="2020" max="2099" placeholder="年" oninput="onSubYearMonthChange()">
+          <select id="sub-inp-month" onchange="onSubYearMonthChange()">
+            <option value="">月（任意）</option>
+            <option value="1">1月</option><option value="2">2月</option>
+            <option value="3">3月</option><option value="4">4月</option>
+            <option value="5">5月</option><option value="6">6月</option>
+            <option value="7">7月</option><option value="8">8月</option>
+            <option value="9">9月</option><option value="10">10月</option>
+            <option value="11">11月</option><option value="12">12月</option>
+          </select>
+        </div>
+        <select id="sub-inp-week">
+          <option value="">週（任意）</option>
+        </select>
+        <input id="sub-inp-date" type="date" placeholder="日（任意）">
+      </div>
+      <div class="modal-footer">
+        <button id="sub-delete-btn" class="btn-danger hidden" onclick="confirmDeleteSubitem()">削除</button>
+        <div style="margin-left:auto;display:flex;gap:8px">
+          <button class="btn-secondary" onclick="closeSubitemModal()">キャンセル</button>
+          <button class="btn-primary" onclick="saveSubitem()">保存</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- #app -->
+
+<script src="/static/app.js"></script>
+</body>
+</html>

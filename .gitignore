@@ -1,0 +1,8 @@
+data/
+__pycache__/
+*.pyc
+*.pyo
+.env
+test_db.py
+preview_export.py
+起動.bat
