@@ -117,17 +117,17 @@ async function loadBucket() {
 
 async function loadMonthly() {
   const data = await api(`/api/monthly-combined?month=${fmtMonth(currentMonth)}`);
-  renderMonthly(data.tasks, data.bucket_items, data.subitems || []);
+  renderMonthly(data.tasks, data.bucket_items, data.subitems || [], data.root_subitem_ids || []);
 }
 
 async function loadWeekly() {
   const data = await api(`/api/weekly-combined?week=${fmtWeek(currentWeek)}`);
-  renderWeekly(data.tasks, data.subitems);
+  renderWeekly(data.tasks, data.subitems || [], data.root_subitem_ids || []);
 }
 
 async function loadDaily() {
   const data = await api(`/api/daily-combined?date=${fmtDate(currentDate)}`);
-  renderDaily(data.tasks, data.subitems);
+  renderDaily(data.tasks, data.subitems || [], data.root_subitem_ids || []);
 }
 
 function updateProgress(tasks) {
@@ -302,7 +302,7 @@ function subitemRowHtml(s, bucketId) {
 }
 
 // ── Monthly render ─────────────────────────────────────────────────────────
-function renderMonthly(tasks, bucketItems, subitems) {
+function renderMonthly(tasks, bucketItems, subitems, rootIds) {
   const el = document.getElementById('monthly-list');
   let html = '';
   let hasContent = false;
@@ -325,36 +325,14 @@ function renderMonthly(tasks, bucketItems, subitems) {
     bucketItems.forEach(item => { html += monthlyBucketItemHtml(item); });
   }
 
-  if (subitems.length) {
+  if (rootIds.length) {
     hasContent = true;
     html += `<div class="section-label" style="margin-top:14px">⭐ やりたいこと（サブ項目）</div>`;
-    const active = subitems.filter(s => !s.completed);
-    const done   = subitems.filter(s =>  s.completed);
-    active.forEach(s => { html += monthlySubitemHtml(s); });
-    if (done.length) {
-      html += `<div class="section-label" style="margin-top:8px">完了済み (${done.length})</div>`;
-      done.forEach(s => { html += monthlySubitemHtml(s); });
-    }
+    html += renderTabSubitems(subitems, rootIds, 'toggleSubitemMonthly');
   }
 
   if (!hasContent) html = emptyState('📋', 'タスクがありません');
   el.innerHTML = html;
-}
-
-function monthlySubitemHtml(s) {
-  subitemsMap.set(s.id, s);
-  const catIcon = (CATEGORIES.find(c => c.key === s.bucket_category) || {}).icon || '⭐';
-  const dateLabel = s.deadline_date
-    ? `<span class="sub-date-label">${s.deadline_date}</span>` : '';
-  return `
-  <div class="task-item${s.completed ? ' done' : ''}">
-    <div class="chk${s.completed ? ' on' : ''}" onclick="toggleSubitemMonthly(${s.id})"></div>
-    <div class="task-body">
-      <div class="task-title-text${s.completed ? ' done' : ''}">${esc(s.title)}${dateLabel}</div>
-      <div class="task-sub">${catIcon} ${esc(s.bucket_title)}</div>
-    </div>
-    <span class="edit-arrow" onclick="editSubitem(${s.id})">›</span>
-  </div>`;
 }
 
 function monthlyBucketItemHtml(item) {
@@ -386,8 +364,51 @@ function monthlyBucketItemHtml(item) {
   </div>`;
 }
 
+// ── Shared tab subitem rendering ───────────────────────────────────────────
+function tabSubitemHtml(s, toggleFn) {
+  subitemsMap.set(s.id, s);
+  const catIcon = (CATEGORIES.find(c => c.key === s.bucket_category) || {}).icon || '⭐';
+  return `
+  <div class="task-item${s.completed ? ' done' : ''}">
+    <div class="chk${s.completed ? ' on' : ''}" onclick="${toggleFn}(${s.id})"></div>
+    <div class="task-body">
+      <div class="task-title-text${s.completed ? ' done' : ''}">${esc(s.title)}</div>
+      <div class="task-sub">${catIcon} ${esc(s.bucket_title)}</div>
+    </div>
+    <button class="add-sub-inline" onclick="showAddSubitem(${s.bucket_id}, ${s.id})" title="サブ項目を追加">＋</button>
+    <span class="edit-arrow" onclick="editSubitem(${s.id})">›</span>
+  </div>`;
+}
+
+function renderTabSubitemNodes(nodes, allSubitems, toggleFn) {
+  let html = '';
+  nodes.forEach(s => {
+    html += tabSubitemHtml(s, toggleFn);
+    const children = allSubitems.filter(c => (c.parent_id ?? null) === s.id)
+      .sort((a, b) => a.completed - b.completed || new Date(a.created_at) - new Date(b.created_at));
+    if (children.length) {
+      html += `<div style="margin-left:18px">${renderTabSubitemNodes(children, allSubitems, toggleFn)}</div>`;
+    }
+  });
+  return html;
+}
+
+function renderTabSubitems(allSubitems, rootIds, toggleFn) {
+  const rootSet = new Set(rootIds);
+  const roots   = allSubitems.filter(s => rootSet.has(s.id))
+    .sort((a, b) => a.completed - b.completed || new Date(a.created_at) - new Date(b.created_at));
+  const active = roots.filter(s => !s.completed);
+  const done   = roots.filter(s =>  s.completed);
+  let html = renderTabSubitemNodes(active, allSubitems, toggleFn);
+  if (done.length) {
+    html += `<div class="section-label" style="margin-top:8px">完了済み (${done.length})</div>`;
+    html += renderTabSubitemNodes(done, allSubitems, toggleFn);
+  }
+  return html;
+}
+
 // ── Weekly render ──────────────────────────────────────────────────────────
-function renderWeekly(tasks, subitems) {
+function renderWeekly(tasks, subitems, rootIds) {
   const el = document.getElementById('weekly-list');
   let html = '';
 
@@ -402,41 +423,19 @@ function renderWeekly(tasks, subitems) {
     }
   }
 
-  if (subitems.length) {
+  if (rootIds.length) {
     html += `<div class="section-label" style="margin-top:${tasks.length ? '14px' : '0'}">⭐ やりたいこと（サブ項目）</div>`;
-    const active = subitems.filter(s => !s.completed);
-    const done   = subitems.filter(s =>  s.completed);
-    active.forEach(s => { html += weeklySubitemHtml(s); });
-    if (done.length) {
-      html += `<div class="section-label" style="margin-top:8px">完了済み (${done.length})</div>`;
-      done.forEach(s => { html += weeklySubitemHtml(s); });
-    }
+    html += renderTabSubitems(subitems, rootIds, 'toggleSubitemWeekly');
   }
 
-  if (!tasks.length && !subitems.length) {
+  if (!tasks.length && !rootIds.length) {
     html = emptyState('📋', 'タスクがありません');
   }
   el.innerHTML = html;
 }
 
-function weeklySubitemHtml(s) {
-  subitemsMap.set(s.id, s);
-  const catIcon = (CATEGORIES.find(c => c.key === s.bucket_category) || {}).icon || '⭐';
-  const dateLabel = s.deadline_date
-    ? `<span class="sub-date-label">${s.deadline_date}</span>` : '';
-  return `
-  <div class="task-item${s.completed ? ' done' : ''}">
-    <div class="chk${s.completed ? ' on' : ''}" onclick="toggleSubitemWeekly(${s.id})"></div>
-    <div class="task-body">
-      <div class="task-title-text${s.completed ? ' done' : ''}">${esc(s.title)}${dateLabel}</div>
-      <div class="task-sub">${catIcon} ${esc(s.bucket_title)}</div>
-    </div>
-    <span class="edit-arrow" onclick="editSubitem(${s.id})">›</span>
-  </div>`;
-}
-
 // ── Daily render ───────────────────────────────────────────────────────────
-function renderDaily(tasks, subitems) {
+function renderDaily(tasks, subitems, rootIds) {
   updateProgress(tasks);
   const el = document.getElementById('daily-list');
   let html = '';
@@ -451,35 +450,15 @@ function renderDaily(tasks, subitems) {
     }
   }
 
-  if (subitems.length) {
+  if (rootIds.length) {
     html += `<div class="section-label" style="margin-top:${tasks.length ? '14px' : '0'}">⭐ やりたいこと（サブ項目）</div>`;
-    const active = subitems.filter(s => !s.completed);
-    const done   = subitems.filter(s =>  s.completed);
-    active.forEach(s => { html += dailySubitemHtml(s); });
-    if (done.length) {
-      html += `<div class="section-label" style="margin-top:8px">完了済み (${done.length})</div>`;
-      done.forEach(s => { html += dailySubitemHtml(s); });
-    }
+    html += renderTabSubitems(subitems, rootIds, 'toggleSubitemDaily');
   }
 
-  if (!tasks.length && !subitems.length) {
+  if (!tasks.length && !rootIds.length) {
     html = emptyState('📋', 'タスクがありません');
   }
   el.innerHTML = html;
-}
-
-function dailySubitemHtml(s) {
-  subitemsMap.set(s.id, s);
-  const catIcon = (CATEGORIES.find(c => c.key === s.bucket_category) || {}).icon || '⭐';
-  return `
-  <div class="task-item${s.completed ? ' done' : ''}">
-    <div class="chk${s.completed ? ' on' : ''}" onclick="toggleSubitemDaily(${s.id})"></div>
-    <div class="task-body">
-      <div class="task-title-text${s.completed ? ' done' : ''}">${esc(s.title)}</div>
-      <div class="task-sub">${catIcon} ${esc(s.bucket_title)}</div>
-    </div>
-    <span class="edit-arrow" onclick="editSubitem(${s.id})">›</span>
-  </div>`;
 }
 
 async function toggleSubitemDaily(id) {

@@ -15,6 +15,32 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(BASE_DIR, 'data', 'goals.db')
 
 
+def fetch_subitem_descendants(conn, parent_ids):
+    """Recursively fetch all descendant subitems (with bucket info) for the given parent ids."""
+    if not parent_ids:
+        return []
+    all_children = []
+    to_process = list(parent_ids)
+    seen = set(parent_ids)
+    while to_process:
+        ph = ','.join('?' * len(to_process))
+        rows = conn.execute(
+            f"""SELECT s.*, b.title AS bucket_title, b.category AS bucket_category
+                FROM bucket_subitems s JOIN bucket_list b ON s.bucket_id=b.id
+                WHERE s.parent_id IN ({ph})""",
+            to_process
+        ).fetchall()
+        new_ids = []
+        for r in rows:
+            d = dict(r)
+            if d['id'] not in seen:
+                all_children.append(d)
+                seen.add(d['id'])
+                new_ids.append(d['id'])
+        to_process = new_ids
+    return all_children
+
+
 def get_db():
     os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
     conn = sqlite3.connect(DB_PATH)
@@ -348,6 +374,7 @@ def monthly_combined():
 
     bucket_items = []
     subitems = []
+    matched_ids = []
     if month:
         try:
             year_i, month_i = int(month.split('-')[0]), int(month.split('-')[1])
@@ -372,12 +399,16 @@ def monthly_combined():
                    ORDER BY s.completed ASC, s.created_at ASC""",
                 (year_i, month_i)
             ).fetchall()
-            subitems = [dict(r) for r in sub_rows]
+            matched = [dict(r) for r in sub_rows]
+            matched_ids = [s['id'] for s in matched]
+            descendants = fetch_subitem_descendants(conn, matched_ids)
+            subitems = matched + descendants
         except Exception:
             pass
 
     conn.close()
-    return jsonify({'tasks': [dict(t) for t in tasks], 'bucket_items': bucket_items, 'subitems': subitems})
+    return jsonify({'tasks': [dict(t) for t in tasks], 'bucket_items': bucket_items,
+                    'subitems': subitems, 'root_subitem_ids': matched_ids})
 
 
 # ─── Weekly Combined ─────────────────────────────────────────────────────────
@@ -393,6 +424,7 @@ def weekly_combined():
     ).fetchall()
 
     subitems = []
+    matched_week_ids = []
     if week:
         rows = conn.execute(
             """SELECT s.*, b.title AS bucket_title, b.category AS bucket_category
@@ -402,10 +434,13 @@ def weekly_combined():
                ORDER BY s.completed ASC, s.created_at ASC""",
             (week,)
         ).fetchall()
-        subitems = [dict(r) for r in rows]
+        matched = [dict(r) for r in rows]
+        matched_week_ids = [s['id'] for s in matched]
+        descendants = fetch_subitem_descendants(conn, matched_week_ids)
+        subitems = matched + descendants
 
     conn.close()
-    return jsonify({'tasks': [dict(t) for t in tasks], 'subitems': subitems})
+    return jsonify({'tasks': [dict(t) for t in tasks], 'subitems': subitems, 'root_subitem_ids': matched_week_ids})
 
 
 # ─── Daily Combined ──────────────────────────────────────────────────────────
@@ -421,6 +456,7 @@ def daily_combined():
     ).fetchall()
 
     subitems = []
+    matched_day_ids = []
     if day:
         rows = conn.execute(
             """SELECT s.*, b.title AS bucket_title, b.category AS bucket_category
@@ -430,10 +466,13 @@ def daily_combined():
                ORDER BY s.completed ASC, s.created_at ASC""",
             (day,)
         ).fetchall()
-        subitems = [dict(r) for r in rows]
+        matched = [dict(r) for r in rows]
+        matched_day_ids = [s['id'] for s in matched]
+        descendants = fetch_subitem_descendants(conn, matched_day_ids)
+        subitems = matched + descendants
 
     conn.close()
-    return jsonify({'tasks': [dict(t) for t in tasks], 'subitems': subitems})
+    return jsonify({'tasks': [dict(t) for t in tasks], 'subitems': subitems, 'root_subitem_ids': matched_day_ids})
 
 
 # ─── Tasks ────────────────────────────────────────────────────────────────────
