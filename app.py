@@ -347,6 +347,7 @@ def monthly_combined():
     ).fetchall()
 
     bucket_items = []
+    subitems = []
     if month:
         try:
             year_i, month_i = int(month.split('-')[0]), int(month.split('-')[1])
@@ -362,11 +363,21 @@ def monthly_combined():
                 d = dict(item)
                 d['subitems'] = [dict(s) for s in subs]
                 bucket_items.append(d)
+
+            sub_rows = conn.execute(
+                """SELECT s.*, b.title AS bucket_title, b.category AS bucket_category
+                   FROM bucket_subitems s
+                   JOIN bucket_list b ON s.bucket_id = b.id
+                   WHERE s.deadline_year=? AND s.deadline_month=? AND b.status=0
+                   ORDER BY s.completed ASC, s.created_at ASC""",
+                (year_i, month_i)
+            ).fetchall()
+            subitems = [dict(r) for r in sub_rows]
         except Exception:
             pass
 
     conn.close()
-    return jsonify({'tasks': [dict(t) for t in tasks], 'bucket_items': bucket_items})
+    return jsonify({'tasks': [dict(t) for t in tasks], 'bucket_items': bucket_items, 'subitems': subitems})
 
 
 # ─── Weekly Combined ─────────────────────────────────────────────────────────
@@ -747,13 +758,15 @@ def index():
     return render_template('index.html')
 
 
-if __name__ == '__main__':
-    init_db()
-    startup_catchup()
+# DB初期化・スケジューラーはWSGI/直接起動どちらでも動くようにモジュールレベルで実行
+init_db()
+startup_catchup()
 
-    scheduler = BackgroundScheduler()
-    scheduler.add_job(scheduled_rollover, 'cron', hour=22, minute=0)
-    scheduler.start()
+scheduler = BackgroundScheduler()
+scheduler.add_job(scheduled_rollover, 'cron', hour=22, minute=0)
+scheduler.start()
+
+if __name__ == '__main__':
 
     local_ip = get_local_ip()
     print("\n" + "=" * 40)

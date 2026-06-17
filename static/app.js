@@ -116,7 +116,7 @@ async function loadBucket() {
 
 async function loadMonthly() {
   const data = await api(`/api/monthly-combined?month=${fmtMonth(currentMonth)}`);
-  renderMonthly(data.tasks, data.bucket_items);
+  renderMonthly(data.tasks, data.bucket_items, data.subitems || []);
 }
 
 async function loadWeekly() {
@@ -281,11 +281,13 @@ function subitemRowHtml(s) {
 }
 
 // ── Monthly render ─────────────────────────────────────────────────────────
-function renderMonthly(tasks, bucketItems) {
+function renderMonthly(tasks, bucketItems, subitems) {
   const el = document.getElementById('monthly-list');
   let html = '';
+  let hasContent = false;
 
   if (tasks.length) {
+    hasContent = true;
     html += `<div class="section-label">📋 月次タスク</div>`;
     const active = tasks.filter(t => !t.completed);
     const done   = tasks.filter(t =>  t.completed);
@@ -297,14 +299,41 @@ function renderMonthly(tasks, bucketItems) {
   }
 
   if (bucketItems.length) {
+    hasContent = true;
     html += `<div class="section-label" style="margin-top:${tasks.length ? '14px' : '0'}">⭐ やりたいこと</div>`;
     bucketItems.forEach(item => { html += monthlyBucketItemHtml(item); });
   }
 
-  if (!tasks.length && !bucketItems.length) {
-    html = emptyState('📋', 'タスクがありません');
+  if (subitems.length) {
+    hasContent = true;
+    html += `<div class="section-label" style="margin-top:14px">⭐ やりたいこと（サブ項目）</div>`;
+    const active = subitems.filter(s => !s.completed);
+    const done   = subitems.filter(s =>  s.completed);
+    active.forEach(s => { html += monthlySubitemHtml(s); });
+    if (done.length) {
+      html += `<div class="section-label" style="margin-top:8px">完了済み (${done.length})</div>`;
+      done.forEach(s => { html += monthlySubitemHtml(s); });
+    }
   }
+
+  if (!hasContent) html = emptyState('📋', 'タスクがありません');
   el.innerHTML = html;
+}
+
+function monthlySubitemHtml(s) {
+  subitemsMap.set(s.id, s);
+  const catIcon = (CATEGORIES.find(c => c.key === s.bucket_category) || {}).icon || '⭐';
+  const dateLabel = s.deadline_date
+    ? `<span class="sub-date-label">${s.deadline_date}</span>` : '';
+  return `
+  <div class="task-item${s.completed ? ' done' : ''}">
+    <div class="chk${s.completed ? ' on' : ''}" onclick="toggleSubitemMonthly(${s.id})"></div>
+    <div class="task-body">
+      <div class="task-title-text${s.completed ? ' done' : ''}">${esc(s.title)}${dateLabel}</div>
+      <div class="task-sub">${catIcon} ${esc(s.bucket_title)}</div>
+    </div>
+    <span class="edit-arrow" onclick="editSubitem(${s.id})">›</span>
+  </div>`;
 }
 
 function monthlyBucketItemHtml(item) {
