@@ -336,21 +336,10 @@ function renderMonthly(tasks, bucketItems, subitems, rootIds) {
 }
 
 function monthlyBucketItemHtml(item) {
+  bucketItemMap.set(item.id, item);
   const subs = item.subitems || [];
   subs.forEach(s => subitemsMap.set(s.id, s));
-
-  let subsHtml = subs.map(s => {
-    const wl = s.deadline_week ? `<span class="sub-week-label">${s.deadline_week}</span>` : '';
-    return `
-    <div class="subitem-row${s.completed ? ' done' : ''}">
-      <div class="sub-line"></div>
-      <div class="chk${s.completed ? ' on' : ''}" onclick="toggleSubitemMonthly(${s.id})"></div>
-      <div class="subitem-body">
-        <span class="subitem-title${s.completed ? ' done' : ''}">${esc(s.title)}</span>
-        ${wl}
-      </div>
-    </div>`;
-  }).join('');
+  const subsHtml = renderSubitemNodes(subs, item.id, null);
 
   return `
   <div>
@@ -359,8 +348,9 @@ function monthlyBucketItemHtml(item) {
       <div class="task-body">
         <div class="task-title-text${item.completed ? ' done' : ''}">${esc(item.title)}</div>
       </div>
+      <button class="add-sub-inline" onclick="showAddSubitem(${item.id}, null)" title="サブ項目を追加">＋</button>
     </div>
-    ${subsHtml}
+    <div class="subitems-panel">${subsHtml}</div>
   </div>`;
 }
 
