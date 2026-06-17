@@ -653,6 +653,25 @@ body {
 }
 .sub-time-label.empty:hover { border-color: var(--primary); color: var(--primary); }
 
+/* Inline add-child button on each subitem */
+.add-sub-inline {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-muted);
+  font-size: 12px;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: border-color 0.15s, color 0.15s;
+  padding: 0;
+}
+.add-sub-inline:hover { border-color: var(--primary); color: var(--primary); }
+
 /* Add subitem button */
 .add-sub-btn {
   background: none;

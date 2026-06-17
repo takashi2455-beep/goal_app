@@ -14,9 +14,10 @@ const subitemsMap   = new Map();   // subitem id  → subitem data
 const bucketItemMap = new Map();   // bucket id   → bucket item data
 const taskMap       = new Map();   // task id     → task data
 
-let subitemBucketId  = null;
-let subitemEditId    = null;
-let pendingTimeItemId    = null;  // bucket item
+let subitemBucketId   = null;
+let subitemEditId     = null;
+let subitemParentId   = null;
+let pendingTimeItemId = null;  // bucket item
 let pendingTimeSubitemId = null;  // subitem
 let pendingTimeTaskId    = null;  // task
 
@@ -217,8 +218,8 @@ function bucketItemHtml(item) {
   subs.forEach(s => subitemsMap.set(s.id, s));
 
   let panel = `<div id="subs-${item.id}" class="subitems-panel${isExpanded ? '' : ' hidden'}">`;
-  subs.forEach(s => { panel += subitemRowHtml(s); });
-  panel += `<button class="add-sub-btn" onclick="showAddSubitem(${item.id})">＋ サブ項目を追加</button>`;
+  panel += renderSubitemNodes(subs, item.id, null);
+  panel += `<button class="add-sub-btn" onclick="showAddSubitem(${item.id}, null)">＋ サブ項目を追加</button>`;
   panel += `</div>`;
 
   // 終了済みチェック (✓)
@@ -258,7 +259,21 @@ function bucketItemHtml(item) {
   </div>`;
 }
 
-function subitemRowHtml(s) {
+function renderSubitemNodes(subitems, bucketId, parentId) {
+  const nodes = subitems.filter(s => (s.parent_id ?? null) === parentId);
+  let html = '';
+  nodes.forEach(s => {
+    html += subitemRowHtml(s, bucketId);
+    const childHtml = renderSubitemNodes(subitems, bucketId, s.id);
+    if (childHtml) {
+      html += `<div style="margin-left:18px">${childHtml}</div>`;
+    }
+  });
+  return html;
+}
+
+function subitemRowHtml(s, bucketId) {
+  subitemsMap.set(s.id, s);
   const monthLabel = s.deadline_year && s.deadline_month
     ? `<span class="sub-month-label">${s.deadline_year}年${s.deadline_month}月</span>`
     : s.deadline_year
@@ -272,6 +287,7 @@ function subitemRowHtml(s) {
       ? `<span class="sub-time-label" onclick="event.stopPropagation();showSubitemTimeModal(${s.id})">⏱ ${esc(s.time_spent)}</span>`
       : `<span class="sub-time-label empty" onclick="event.stopPropagation();showSubitemTimeModal(${s.id})">⏱ 時間を記録</span>`
     : '';
+  const bid = bucketId ?? s.bucket_id;
   return `
   <div class="subitem-row${s.completed ? ' done' : ''}">
     <div class="sub-line"></div>
@@ -280,6 +296,7 @@ function subitemRowHtml(s) {
       <span class="subitem-title${s.completed ? ' done' : ''}">${esc(s.title)}</span>
       ${monthLabel}${weekLabel}${dateLabel}${timeLabel}
     </div>
+    <button class="add-sub-inline" onclick="showAddSubitem(${bid}, ${s.id})" title="サブ項目を追加">＋</button>
     <span class="edit-arrow" onclick="editSubitem(${s.id})">›</span>
   </div>`;
 }
@@ -826,17 +843,21 @@ function onSubYearMonthChange() {
   populateWeekDropdown(y, m, '');
 }
 
-function showAddSubitem(bucketId) {
-  const item = bucketItemMap.get(bucketId);
+function showAddSubitem(bucketId, parentSubId) {
+  const item      = bucketItemMap.get(bucketId);
+  const parentSub = parentSubId ? subitemsMap.get(parentSubId) : null;
   subitemBucketId = bucketId;
   subitemEditId   = null;
-  document.getElementById('subitem-title').textContent = 'サブ項目追加';
+  subitemParentId = parentSubId ?? null;
+  const refYear  = parentSub?.deadline_year  || item?.deadline_year  || '2026';
+  const refMonth = parentSub?.deadline_month || item?.deadline_month || '';
+  document.getElementById('subitem-title').textContent = parentSubId ? 'サブ項目追加（子）' : 'サブ項目追加';
   document.getElementById('sub-delete-btn').classList.add('hidden');
   document.getElementById('sub-inp-title').value = '';
-  document.getElementById('sub-inp-year').value  = item?.deadline_year  || '2026';
-  document.getElementById('sub-inp-month').value = item?.deadline_month || '';
+  document.getElementById('sub-inp-year').value  = refYear;
+  document.getElementById('sub-inp-month').value = refMonth;
   document.getElementById('sub-inp-date').value  = '';
-  populateWeekDropdown(item?.deadline_year, item?.deadline_month, '');
+  populateWeekDropdown(refYear, refMonth, '');
   document.getElementById('subitem-overlay').classList.remove('hidden');
   setTimeout(() => document.getElementById('sub-inp-title').focus(), 80);
 }
@@ -859,7 +880,7 @@ function editSubitem(id) {
 
 function closeSubitemModal() {
   document.getElementById('subitem-overlay').classList.add('hidden');
-  subitemBucketId = subitemEditId = null;
+  subitemBucketId = subitemEditId = subitemParentId = null;
 }
 
 async function saveSubitem() {
@@ -875,6 +896,7 @@ async function saveSubitem() {
     deadline_month: month ? parseInt(month) : null,
     deadline_week:  week  || null,
     deadline_date:  ddate || null,
+    parent_id:      subitemParentId ?? null,
   };
 
   if (subitemEditId != null) {

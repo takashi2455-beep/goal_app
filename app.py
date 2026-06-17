@@ -80,7 +80,7 @@ def init_db():
             conn.execute(f"ALTER TABLE bucket_list ADD COLUMN {col} {defn}")
         except Exception:
             pass
-    for col in ['deadline_date TEXT', 'time_spent TEXT']:
+    for col in ['deadline_date TEXT', 'time_spent TEXT', 'parent_id INTEGER']:
         try:
             conn.execute(f"ALTER TABLE bucket_subitems ADD COLUMN {col}")
         except Exception:
@@ -279,8 +279,8 @@ def add_subitem(item_id):
     data = request.json
     conn = get_db()
     cur = conn.execute(
-        "INSERT INTO bucket_subitems (bucket_id, title, deadline_year, deadline_month, deadline_week, deadline_date) VALUES (?, ?, ?, ?, ?, ?)",
-        (item_id, data['title'], data.get('deadline_year'), data.get('deadline_month'), data.get('deadline_week'), data.get('deadline_date'))
+        "INSERT INTO bucket_subitems (bucket_id, title, deadline_year, deadline_month, deadline_week, deadline_date, parent_id) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (item_id, data['title'], data.get('deadline_year'), data.get('deadline_month'), data.get('deadline_week'), data.get('deadline_date'), data.get('parent_id'))
     )
     conn.commit()
     sub = conn.execute("SELECT * FROM bucket_subitems WHERE id=?", (cur.lastrowid,)).fetchone()
