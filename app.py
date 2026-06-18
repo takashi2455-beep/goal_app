@@ -163,6 +163,13 @@ def do_rollover(from_date_str, to_date_str):
                 )
                 count += 1
 
+        # Roll over uncompleted subitems with deadline_date
+        sub_count = conn.execute(
+            "UPDATE bucket_subitems SET deadline_date=? WHERE deadline_date=? AND completed=0",
+            (to_date_str, from_date_str)
+        ).rowcount
+        count += sub_count
+
         conn.execute(
             "INSERT INTO rollover_log (from_date, to_date, count) VALUES (?, ?, ?)",
             (from_date_str, to_date_str, count)
@@ -181,12 +188,32 @@ def scheduled_rollover():
     do_rollover(today, tomorrow)
 
 
+def do_catchup(today=None):
+    """過去日付の未完了タスク・サブ項目をすべて今日に移動する。"""
+    if not today:
+        today = date.today().isoformat()
+    conn = get_db()
+    try:
+        t_count = conn.execute(
+            "UPDATE tasks SET target_date=? WHERE task_type='daily' AND target_date<? AND completed=0",
+            (today, today)
+        ).rowcount
+        s_count = conn.execute(
+            "UPDATE bucket_subitems SET deadline_date=? "
+            "WHERE deadline_date IS NOT NULL AND deadline_date!='' AND deadline_date<? AND completed=0",
+            (today, today)
+        ).rowcount
+        conn.commit()
+        total = t_count + s_count
+        if total > 0:
+            print(f"[キャッチアップ] {today}: タスク{t_count}件・サブ項目{s_count}件を今日に移動")
+        return total
+    finally:
+        conn.close()
+
+
 def startup_catchup():
-    yesterday = (date.today() - timedelta(days=1)).isoformat()
-    today = date.today().isoformat()
-    count = do_rollover(yesterday, today)
-    if count > 0:
-        print(f"[起動時キャッチアップ] {count}件のタスクを今日に繰り越しました")
+    do_catchup()
 
 
 # ─── Bucket List ──────────────────────────────────────────────────────────────
@@ -581,6 +608,14 @@ def manual_rollover():
     return jsonify({'ok': True, 'rolled': count})
 
 
+@app.route('/api/catchup', methods=['POST'])
+def api_catchup():
+    data = request.json or {}
+    today = data.get('today') or date.today().isoformat()
+    count = do_catchup(today)
+    return jsonify({'ok': True, 'moved': count, 'today': today})
+
+
 # ─── Export ───────────────────────────────────────────────────────────────────
 
 @app.route('/api/export/text', methods=['GET'])
@@ -802,7 +837,7 @@ init_db()
 startup_catchup()
 
 scheduler = BackgroundScheduler()
-scheduler.add_job(scheduled_rollover, 'cron', hour=22, minute=0)
+scheduler.add_job(do_catchup, 'cron', hour=0, minute=0)
 scheduler.start()
 
 if __name__ == '__main__':

@@ -24,7 +24,9 @@ let pendingTimeTaskId    = null;  // task
 // ── Init ───────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
   updateLabels();
-  loadBucket();
+  const todayStr = fmtDate(new Date());
+  api('/api/catchup', { method: 'POST', body: JSON.stringify({ today: todayStr }) }).then(() => loadBucket());
+
 
   document.addEventListener('click', e => {
     if (!e.target.closest('#export-btn') && !e.target.closest('#export-menu')) {
