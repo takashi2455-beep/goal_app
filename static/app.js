@@ -124,12 +124,12 @@ async function loadMonthly() {
 
 async function loadWeekly() {
   const data = await api(`/api/weekly-combined?week=${fmtWeek(currentWeek)}`);
-  renderWeekly(data.tasks, data.subitems || [], data.root_subitem_ids || []);
+  renderWeekly(data.tasks, data.bucket_items || [], data.subitems || [], data.root_subitem_ids || []);
 }
 
 async function loadDaily() {
   const data = await api(`/api/daily-combined?date=${fmtDate(currentDate)}`);
-  renderDaily(data.tasks, data.subitems || [], data.root_subitem_ids || []);
+  renderDaily(data.tasks, data.bucket_items || [], data.subitems || [], data.root_subitem_ids || []);
 }
 
 function updateProgress(tasks) {
@@ -400,11 +400,13 @@ function renderTabSubitems(allSubitems, rootIds, toggleFn) {
 }
 
 // ── Weekly render ──────────────────────────────────────────────────────────
-function renderWeekly(tasks, subitems, rootIds) {
+function renderWeekly(tasks, bucketItems, subitems, rootIds) {
   const el = document.getElementById('weekly-list');
   let html = '';
+  let hasContent = false;
 
   if (tasks.length) {
+    hasContent = true;
     html += `<div class="section-label">📋 週次タスク</div>`;
     const active = tasks.filter(t => !t.completed);
     const done   = tasks.filter(t =>  t.completed);
@@ -415,24 +417,31 @@ function renderWeekly(tasks, subitems, rootIds) {
     }
   }
 
+  if (bucketItems.length) {
+    hasContent = true;
+    html += `<div class="section-label" style="margin-top:${tasks.length ? '14px' : '0'}">⭐ やりたいこと</div>`;
+    bucketItems.forEach(item => { html += monthlyBucketItemHtml(item); });
+  }
+
   if (rootIds.length) {
-    html += `<div class="section-label" style="margin-top:${tasks.length ? '14px' : '0'}">⭐ やりたいこと（サブ項目）</div>`;
+    hasContent = true;
+    html += `<div class="section-label" style="margin-top:14px">⭐ やりたいこと（サブ項目）</div>`;
     html += renderTabSubitems(subitems, rootIds, 'toggleSubitemWeekly');
   }
 
-  if (!tasks.length && !rootIds.length) {
-    html = emptyState('📋', 'タスクがありません');
-  }
+  if (!hasContent) html = emptyState('📋', 'タスクがありません');
   el.innerHTML = html;
 }
 
 // ── Daily render ───────────────────────────────────────────────────────────
-function renderDaily(tasks, subitems, rootIds) {
+function renderDaily(tasks, bucketItems, subitems, rootIds) {
   updateProgress(tasks);
   const el = document.getElementById('daily-list');
   let html = '';
+  let hasContent = false;
 
   if (tasks.length) {
+    hasContent = true;
     const active = tasks.filter(t => !t.completed);
     const done   = tasks.filter(t =>  t.completed);
     active.forEach(t => { html += taskItemHtml(t); });
@@ -442,14 +451,19 @@ function renderDaily(tasks, subitems, rootIds) {
     }
   }
 
+  if (bucketItems.length) {
+    hasContent = true;
+    html += `<div class="section-label" style="margin-top:${tasks.length ? '14px' : '0'}">⭐ やりたいこと</div>`;
+    bucketItems.forEach(item => { html += monthlyBucketItemHtml(item); });
+  }
+
   if (rootIds.length) {
-    html += `<div class="section-label" style="margin-top:${tasks.length ? '14px' : '0'}">⭐ やりたいこと（サブ項目）</div>`;
+    hasContent = true;
+    html += `<div class="section-label" style="margin-top:14px">⭐ やりたいこと（サブ項目）</div>`;
     html += renderTabSubitems(subitems, rootIds, 'toggleSubitemDaily');
   }
 
-  if (!tasks.length && !rootIds.length) {
-    html = emptyState('📋', 'タスクがありません');
-  }
+  if (!hasContent) html = emptyState('📋', 'タスクがありません');
   el.innerHTML = html;
 }
 
@@ -647,7 +661,9 @@ function setBucketFieldsVisible(prefix, visible) {
     document.getElementById(`${prefix}-${f}`).style.display = visible ? '' : 'none';
   });
   const overlayId = prefix === 'inp' ? 'add-overlay' : 'edit-overlay';
-  document.querySelector(`#${overlayId} .deadline-row`).style.display = visible ? '' : 'none';
+  document.querySelectorAll(`#${overlayId} .deadline-row`).forEach(el => {
+    el.style.display = visible ? '' : 'none';
+  });
 }
 
 function showAddModal() {
@@ -662,6 +678,8 @@ function showAddModal() {
   document.getElementById('inp-cat').value   = 'must';
   document.getElementById('inp-year').value  = '2026';
   document.getElementById('inp-month').value = '';
+  document.getElementById('inp-week').innerHTML = '<option value="">週（任意）</option>';
+  document.getElementById('inp-date').value  = '';
   setBucketFieldsVisible('inp', isBucket);
 
   document.getElementById('add-overlay').classList.remove('hidden');
@@ -687,6 +705,8 @@ async function saveAdd() {
         category:       document.getElementById('inp-cat').value,
         deadline_year:  year  ? parseInt(year)  : null,
         deadline_month: month ? parseInt(month) : null,
+        deadline_week:  document.getElementById('inp-week').value || null,
+        deadline_date:  document.getElementById('inp-date').value || null,
       })
     });
     closeAddModal(); loadBucket();
@@ -711,6 +731,8 @@ async function openEditBucket(id) {
   document.getElementById('edit-cat').value   = item.category    || 'must';
   document.getElementById('edit-year').value  = item.deadline_year  || '2026';
   document.getElementById('edit-month').value = item.deadline_month || '';
+  document.getElementById('edit-date').value  = item.deadline_date  || '';
+  populateWeekDropdown(item.deadline_year || '2026', item.deadline_month || '', item.deadline_week || '', 'edit-week');
   setBucketFieldsVisible('edit', true);
   document.getElementById('edit-overlay').classList.remove('hidden');
   setTimeout(() => document.getElementById('edit-title').focus(), 80);
@@ -751,6 +773,8 @@ async function saveEdit() {
         category:       document.getElementById('edit-cat').value,
         deadline_year:  year  ? parseInt(year)  : null,
         deadline_month: month ? parseInt(month) : null,
+        deadline_week:  document.getElementById('edit-week').value || null,
+        deadline_date:  document.getElementById('edit-date').value || null,
       })
     });
     closeEditModal(); loadBucket();
@@ -795,8 +819,9 @@ function getWeeksInMonth(year, month) {
   return weeks;
 }
 
-function populateWeekDropdown(year, month, selectedWeek) {
-  const sel = document.getElementById('sub-inp-week');
+function populateWeekDropdown(year, month, selectedWeek, selectId = 'sub-inp-week') {
+  const sel = document.getElementById(selectId);
+  if (!sel) return;
   sel.innerHTML = '<option value="">週（任意）</option>';
   if (!year || !month) return;
   getWeeksInMonth(parseInt(year), parseInt(month)).forEach(({ week, label }) => {
@@ -811,7 +836,13 @@ function populateWeekDropdown(year, month, selectedWeek) {
 function onSubYearMonthChange() {
   const y = document.getElementById('sub-inp-year').value;
   const m = document.getElementById('sub-inp-month').value;
-  populateWeekDropdown(y, m, '');
+  populateWeekDropdown(y, m, '', 'sub-inp-week');
+}
+
+function onBucketYearMonthChange(prefix) {
+  const y = document.getElementById(`${prefix}-year`).value;
+  const m = document.getElementById(`${prefix}-month`).value;
+  populateWeekDropdown(y, m, '', `${prefix}-week`);
 }
 
 function showAddSubitem(bucketId, parentSubId) {

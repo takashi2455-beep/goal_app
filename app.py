@@ -116,6 +116,11 @@ def init_db():
             conn.execute(f"ALTER TABLE tasks ADD COLUMN {col}")
         except Exception:
             pass
+    for col in ['deadline_week TEXT', 'deadline_date TEXT']:
+        try:
+            conn.execute(f"ALTER TABLE bucket_list ADD COLUMN {col}")
+        except Exception:
+            pass
     # Migrate existing completed=1 rows to status=1
     try:
         conn.execute("UPDATE bucket_list SET status=1 WHERE completed=1 AND status=0")
@@ -203,8 +208,13 @@ def do_catchup(today=None):
             "WHERE deadline_date IS NOT NULL AND deadline_date!='' AND deadline_date<? AND completed=0",
             (today, today)
         ).rowcount
+        b_count = conn.execute(
+            "UPDATE bucket_list SET deadline_date=? "
+            "WHERE deadline_date IS NOT NULL AND deadline_date!='' AND deadline_date<? AND (status=0 OR status IS NULL)",
+            (today, today)
+        ).rowcount
         conn.commit()
-        total = t_count + s_count
+        total = t_count + s_count + b_count
         if total > 0:
             print(f"[キャッチアップ] {today}: タスク{t_count}件・サブ項目{s_count}件を今日に移動")
         return total
@@ -262,9 +272,10 @@ def add_bucket():
     data = request.json
     conn = get_db()
     cur = conn.execute(
-        "INSERT INTO bucket_list (title, description, category, deadline_year, deadline_month) VALUES (?, ?, ?, ?, ?)",
+        "INSERT INTO bucket_list (title, description, category, deadline_year, deadline_month, deadline_week, deadline_date) VALUES (?, ?, ?, ?, ?, ?, ?)",
         (data['title'], data.get('description', ''), data.get('category', 'must'),
-         data.get('deadline_year'), data.get('deadline_month'))
+         data.get('deadline_year'), data.get('deadline_month'),
+         data.get('deadline_week'), data.get('deadline_date'))
     )
     conn.commit()
     item = conn.execute("SELECT * FROM bucket_list WHERE id=?", (cur.lastrowid,)).fetchone()
@@ -277,9 +288,10 @@ def update_bucket(item_id):
     data = request.json
     conn = get_db()
     conn.execute(
-        "UPDATE bucket_list SET title=?, description=?, category=?, deadline_year=?, deadline_month=? WHERE id=?",
+        "UPDATE bucket_list SET title=?, description=?, category=?, deadline_year=?, deadline_month=?, deadline_week=?, deadline_date=? WHERE id=?",
         (data['title'], data.get('description', ''), data.get('category', 'must'),
-         data.get('deadline_year'), data.get('deadline_month'), item_id)
+         data.get('deadline_year'), data.get('deadline_month'),
+         data.get('deadline_week'), data.get('deadline_date'), item_id)
     )
     conn.commit()
     item = conn.execute("SELECT * FROM bucket_list WHERE id=?", (item_id,)).fetchone()
@@ -450,9 +462,23 @@ def weekly_combined():
         (week,)
     ).fetchall()
 
+    bucket_items = []
     subitems = []
     matched_week_ids = []
     if week:
+        b_rows = conn.execute(
+            "SELECT * FROM bucket_list WHERE deadline_week=? AND (status=0 OR status IS NULL) ORDER BY created_at ASC",
+            (week,)
+        ).fetchall()
+        for item in b_rows:
+            subs = conn.execute(
+                "SELECT * FROM bucket_subitems WHERE bucket_id=? ORDER BY completed ASC, created_at ASC",
+                (item['id'],)
+            ).fetchall()
+            d = dict(item)
+            d['subitems'] = [dict(s) for s in subs]
+            bucket_items.append(d)
+
         rows = conn.execute(
             """SELECT s.*, b.title AS bucket_title, b.category AS bucket_category
                FROM bucket_subitems s
@@ -467,7 +493,8 @@ def weekly_combined():
         subitems = matched + descendants
 
     conn.close()
-    return jsonify({'tasks': [dict(t) for t in tasks], 'subitems': subitems, 'root_subitem_ids': matched_week_ids})
+    return jsonify({'tasks': [dict(t) for t in tasks], 'bucket_items': bucket_items,
+                    'subitems': subitems, 'root_subitem_ids': matched_week_ids})
 
 
 # ─── Daily Combined ──────────────────────────────────────────────────────────
@@ -482,9 +509,23 @@ def daily_combined():
         (day,)
     ).fetchall()
 
+    bucket_items = []
     subitems = []
     matched_day_ids = []
     if day:
+        b_rows = conn.execute(
+            "SELECT * FROM bucket_list WHERE deadline_date=? AND (status=0 OR status IS NULL) ORDER BY created_at ASC",
+            (day,)
+        ).fetchall()
+        for item in b_rows:
+            subs = conn.execute(
+                "SELECT * FROM bucket_subitems WHERE bucket_id=? ORDER BY completed ASC, created_at ASC",
+                (item['id'],)
+            ).fetchall()
+            d = dict(item)
+            d['subitems'] = [dict(s) for s in subs]
+            bucket_items.append(d)
+
         rows = conn.execute(
             """SELECT s.*, b.title AS bucket_title, b.category AS bucket_category
                FROM bucket_subitems s
@@ -499,7 +540,8 @@ def daily_combined():
         subitems = matched + descendants
 
     conn.close()
-    return jsonify({'tasks': [dict(t) for t in tasks], 'subitems': subitems, 'root_subitem_ids': matched_day_ids})
+    return jsonify({'tasks': [dict(t) for t in tasks], 'bucket_items': bucket_items,
+                    'subitems': subitems, 'root_subitem_ids': matched_day_ids})
 
 
 # ─── Tasks ────────────────────────────────────────────────────────────────────
