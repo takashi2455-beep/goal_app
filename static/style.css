@@ -655,10 +655,10 @@ body {
 
 /* Duplicate button */
 .dup-btn {
-  background: none;
-  border: 1px solid var(--border);
+  background: #fffbeb;
+  border: 1px solid #f59e0b;
   border-radius: 4px;
-  color: var(--text-muted);
+  color: #b45309;
   font-size: 13px;
   width: 22px;
   height: 22px;
@@ -667,11 +667,11 @@ body {
   justify-content: center;
   cursor: pointer;
   flex-shrink: 0;
-  transition: border-color 0.15s, color 0.15s;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
   padding: 0;
   line-height: 1;
 }
-.dup-btn:hover { border-color: #10b981; color: #10b981; }
+.dup-btn:hover { background: #fef3c7; border-color: #d97706; color: #92400e; }
 
 /* Inline add-child button on each subitem */
 .add-sub-inline {
