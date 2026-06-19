@@ -326,7 +326,13 @@ function renderMonthly(tasks, bucketItems, subitems, rootIds) {
   if (bucketItems.length) {
     hasContent = true;
     html += `<div class="section-label" style="margin-top:${tasks.length ? '14px' : '0'}">⭐ やりたいこと</div>`;
-    bucketItems.forEach(item => { html += monthlyBucketItemHtml(item); });
+    const bActive = bucketItems.filter(i => i.status !== 1);
+    const bDone   = bucketItems.filter(i => i.status === 1);
+    bActive.forEach(item => { html += monthlyBucketItemHtml(item); });
+    if (bDone.length) {
+      html += `<div class="section-label" style="margin-top:8px">完了済み (${bDone.length})</div>`;
+      bDone.forEach(item => { html += monthlyBucketItemHtml(item); });
+    }
   }
 
   if (rootIds.length) {
@@ -341,16 +347,17 @@ function renderMonthly(tasks, bucketItems, subitems, rootIds) {
 
 function monthlyBucketItemHtml(item) {
   bucketItemMap.set(item.id, item);
+  const isDone = item.status === 1;
   const subs = item.subitems || [];
   subs.forEach(s => subitemsMap.set(s.id, s));
   const subsHtml = renderSubitemNodes(subs, item.id, null);
 
   return `
   <div>
-    <div class="task-item${item.completed ? ' done' : ''}">
-      <div class="chk chk-sq${item.completed ? ' on' : ''}" onclick="toggleBucketMonthly(${item.id})"></div>
+    <div class="task-item${isDone ? ' done' : ''}">
+      <div class="chk chk-sq${isDone ? ' on' : ''}" onclick="toggleBucketMonthly(${item.id})"></div>
       <div class="task-body">
-        <div class="task-title-text${item.completed ? ' done' : ''}">${esc(item.title)}</div>
+        <div class="task-title-text${isDone ? ' done' : ''}">${esc(item.title)}</div>
       </div>
       <button class="add-sub-inline" onclick="showAddSubitem(${item.id}, null)" title="サブ項目を追加">＋</button>
       <button class="dup-btn" onclick="event.stopPropagation();duplicateBucket(${item.id})" title="複製">⧉</button>
@@ -424,7 +431,13 @@ function renderWeekly(tasks, bucketItems, subitems, rootIds) {
   if (bucketItems.length) {
     hasContent = true;
     html += `<div class="section-label" style="margin-top:${tasks.length ? '14px' : '0'}">⭐ やりたいこと</div>`;
-    bucketItems.forEach(item => { html += monthlyBucketItemHtml(item); });
+    const bActive = bucketItems.filter(i => i.status !== 1);
+    const bDone   = bucketItems.filter(i => i.status === 1);
+    bActive.forEach(item => { html += monthlyBucketItemHtml(item); });
+    if (bDone.length) {
+      html += `<div class="section-label" style="margin-top:8px">完了済み (${bDone.length})</div>`;
+      bDone.forEach(item => { html += monthlyBucketItemHtml(item); });
+    }
   }
 
   if (rootIds.length) {
@@ -458,7 +471,13 @@ function renderDaily(tasks, bucketItems, subitems, rootIds) {
   if (bucketItems.length) {
     hasContent = true;
     html += `<div class="section-label" style="margin-top:${tasks.length ? '14px' : '0'}">⭐ やりたいこと</div>`;
-    bucketItems.forEach(item => { html += monthlyBucketItemHtml(item); });
+    const bActive = bucketItems.filter(i => i.status !== 1);
+    const bDone   = bucketItems.filter(i => i.status === 1);
+    bActive.forEach(item => { html += monthlyBucketItemHtml(item); });
+    if (bDone.length) {
+      html += `<div class="section-label" style="margin-top:8px">完了済み (${bDone.length})</div>`;
+      bDone.forEach(item => { html += monthlyBucketItemHtml(item); });
+    }
   }
 
   if (rootIds.length) {
@@ -649,7 +668,7 @@ async function toggleBucketMonthly(id) {
   const item = await api(`/api/bucket/${id}`);
   const newStatus = (item.status ?? 0) === 1 ? 0 : 1;
   await api(`/api/bucket/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status: newStatus }) });
-  loadBucket(); loadMonthly();
+  loadBucket(); loadMonthly(); loadWeekly(); loadDaily();
 }
 async function toggleTask(id) {
   const updated = await api(`/api/tasks/${id}/toggle`, { method: 'PATCH' });

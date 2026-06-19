@@ -431,7 +431,7 @@ def monthly_combined():
         try:
             year_i, month_i = int(month.split('-')[0]), int(month.split('-')[1])
             rows = conn.execute(
-                "SELECT * FROM bucket_list WHERE deadline_year=? AND deadline_month=? AND (status=0 OR status IS NULL) ORDER BY created_at ASC",
+                "SELECT * FROM bucket_list WHERE deadline_year=? AND deadline_month=? AND (status IS NULL OR status != 2) ORDER BY status ASC, created_at ASC",
                 (year_i, month_i)
             ).fetchall()
             for item in rows:
@@ -480,7 +480,7 @@ def weekly_combined():
     matched_week_ids = []
     if week:
         b_rows = conn.execute(
-            "SELECT * FROM bucket_list WHERE deadline_week=? AND (status=0 OR status IS NULL) ORDER BY created_at ASC",
+            "SELECT * FROM bucket_list WHERE deadline_week=? AND (status IS NULL OR status != 2) ORDER BY status ASC, created_at ASC",
             (week,)
         ).fetchall()
         for item in b_rows:
@@ -527,7 +527,7 @@ def daily_combined():
     matched_day_ids = []
     if day:
         b_rows = conn.execute(
-            "SELECT * FROM bucket_list WHERE deadline_date=? AND (status=0 OR status IS NULL) ORDER BY created_at ASC",
+            "SELECT * FROM bucket_list WHERE deadline_date=? AND (status IS NULL OR status != 2) ORDER BY status ASC, created_at ASC",
             (day,)
         ).fetchall()
         for item in b_rows:
