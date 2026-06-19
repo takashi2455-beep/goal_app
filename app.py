@@ -850,8 +850,8 @@ def export_text():
     ).fetchall()
     def fmt_task_line(t, extra=''):
         mark = "✓" if t['completed'] else "○"
-        cd = f"  完了: {t['completed_at'][:10]}" if t.get('completed_at') else ""
-        ts = f"  所要時間: {t['time_spent']}" if t.get('time_spent') else ""
+        cd = f"  完了: {t['completed_at'][:10]}" if t['completed_at'] else ""
+        ts = f"  所要時間: {t['time_spent']}" if t['time_spent'] else ""
         return f"    [{mark}] {t['title']}{extra}{cd}{ts}"
 
     if monthly:
