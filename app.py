@@ -15,6 +15,16 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(BASE_DIR, 'data', 'goals.db')
 
 
+def next_day(date_str):
+    """Return the next calendar day, or None if input is falsy."""
+    if not date_str:
+        return None
+    try:
+        return (datetime.strptime(date_str, '%Y-%m-%d') + timedelta(days=1)).strftime('%Y-%m-%d')
+    except Exception:
+        return date_str
+
+
 def fetch_subitem_descendants(conn, parent_ids):
     """Recursively fetch all descendant subitems (with bucket info) for the given parent ids."""
     if not parent_ids:
@@ -640,6 +650,79 @@ def delete_task(task_id):
     conn.commit()
     conn.close()
     return jsonify({'ok': True})
+
+
+@app.route('/api/bucket/<int:item_id>/duplicate', methods=['POST'])
+def duplicate_bucket(item_id):
+    conn = get_db()
+    item = conn.execute("SELECT * FROM bucket_list WHERE id=?", (item_id,)).fetchone()
+    if not item:
+        conn.close()
+        return jsonify({'error': 'not found'}), 404
+    d = dict(item)
+    cur = conn.execute(
+        "INSERT INTO bucket_list (title, description, category, deadline_year, deadline_month, deadline_week, deadline_date) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (d['title'], d.get('description', ''), d.get('category', 'must'),
+         d.get('deadline_year'), d.get('deadline_month'), d.get('deadline_week'),
+         next_day(d.get('deadline_date')))
+    )
+    new_id = cur.lastrowid
+    subs = conn.execute("SELECT * FROM bucket_subitems WHERE bucket_id=? ORDER BY id ASC", (item_id,)).fetchall()
+    id_map = {}
+    for s in subs:
+        sd = dict(s)
+        c2 = conn.execute(
+            "INSERT INTO bucket_subitems (bucket_id, title, deadline_year, deadline_month, deadline_week, deadline_date, parent_id) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (new_id, sd['title'], sd.get('deadline_year'), sd.get('deadline_month'),
+             sd.get('deadline_week'), next_day(sd.get('deadline_date')), None)
+        )
+        id_map[sd['id']] = c2.lastrowid
+    for old_id, new_sub_id in id_map.items():
+        old_parent = next((dict(s)['parent_id'] for s in subs if s['id'] == old_id), None)
+        if old_parent and old_parent in id_map:
+            conn.execute("UPDATE bucket_subitems SET parent_id=? WHERE id=?", (id_map[old_parent], new_sub_id))
+    conn.commit()
+    new_item = conn.execute("SELECT * FROM bucket_list WHERE id=?", (new_id,)).fetchone()
+    conn.close()
+    return jsonify(dict(new_item)), 201
+
+
+@app.route('/api/tasks/<int:task_id>/duplicate', methods=['POST'])
+def duplicate_task(task_id):
+    conn = get_db()
+    task = conn.execute("SELECT * FROM tasks WHERE id=?", (task_id,)).fetchone()
+    if not task:
+        conn.close()
+        return jsonify({'error': 'not found'}), 404
+    d = dict(task)
+    new_date = next_day(d.get('target_date')) if d.get('task_type') == 'daily' else d.get('target_date')
+    cur = conn.execute(
+        "INSERT INTO tasks (title, task_type, target_date, target_week, target_month) VALUES (?, ?, ?, ?, ?)",
+        (d['title'], d['task_type'], new_date, d.get('target_week'), d.get('target_month'))
+    )
+    conn.commit()
+    new_task = conn.execute("SELECT * FROM tasks WHERE id=?", (cur.lastrowid,)).fetchone()
+    conn.close()
+    return jsonify(dict(new_task)), 201
+
+
+@app.route('/api/subitems/<int:sub_id>/duplicate', methods=['POST'])
+def duplicate_subitem(sub_id):
+    conn = get_db()
+    sub = conn.execute("SELECT * FROM bucket_subitems WHERE id=?", (sub_id,)).fetchone()
+    if not sub:
+        conn.close()
+        return jsonify({'error': 'not found'}), 404
+    d = dict(sub)
+    cur = conn.execute(
+        "INSERT INTO bucket_subitems (bucket_id, title, deadline_year, deadline_month, deadline_week, deadline_date, parent_id) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (d['bucket_id'], d['title'], d.get('deadline_year'), d.get('deadline_month'),
+         d.get('deadline_week'), next_day(d.get('deadline_date')), d.get('parent_id'))
+    )
+    conn.commit()
+    new_sub = conn.execute("SELECT * FROM bucket_subitems WHERE id=?", (cur.lastrowid,)).fetchone()
+    conn.close()
+    return jsonify(dict(new_sub)), 201
 
 
 @app.route('/api/rollover', methods=['POST'])

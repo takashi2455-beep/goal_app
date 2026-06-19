@@ -255,6 +255,7 @@ function bucketItemHtml(item) {
       ${subBadge}
       <button class="expand-btn" onclick="toggleExpand(${item.id})">${isExpanded ? '▼' : '▶'}</button>
       ${dropChk}
+      <button class="dup-btn" onclick="event.stopPropagation();duplicateBucket(${item.id})" title="複製">⊕</button>
       <span class="edit-arrow" onclick="openEditBucket(${item.id})">›</span>
     </div>
     ${panel}
@@ -299,6 +300,7 @@ function subitemRowHtml(s, bucketId) {
       ${monthLabel}${weekLabel}${dateLabel}${timeLabel}
     </div>
     <button class="add-sub-inline" onclick="showAddSubitem(${bid}, ${s.id})" title="サブ項目を追加">＋</button>
+    <button class="dup-btn" onclick="event.stopPropagation();duplicateSubitem(${s.id})" title="複製">⊕</button>
     <span class="edit-arrow" onclick="editSubitem(${s.id})">›</span>
   </div>`;
 }
@@ -351,6 +353,7 @@ function monthlyBucketItemHtml(item) {
         <div class="task-title-text${item.completed ? ' done' : ''}">${esc(item.title)}</div>
       </div>
       <button class="add-sub-inline" onclick="showAddSubitem(${item.id}, null)" title="サブ項目を追加">＋</button>
+      <button class="dup-btn" onclick="event.stopPropagation();duplicateBucket(${item.id})" title="複製">⊕</button>
     </div>
     <div class="subitems-panel">${subsHtml}</div>
   </div>`;
@@ -368,6 +371,7 @@ function tabSubitemHtml(s, toggleFn) {
       <div class="task-sub">${catIcon} ${esc(s.bucket_title)}</div>
     </div>
     <button class="add-sub-inline" onclick="showAddSubitem(${s.bucket_id}, ${s.id})" title="サブ項目を追加">＋</button>
+    <button class="dup-btn" onclick="event.stopPropagation();duplicateSubitem(${s.id})" title="複製">⊕</button>
     <span class="edit-arrow" onclick="editSubitem(${s.id})">›</span>
   </div>`;
 }
@@ -467,6 +471,23 @@ function renderDaily(tasks, bucketItems, subitems, rootIds) {
   el.innerHTML = html;
 }
 
+async function duplicateTask(id) {
+  await api(`/api/tasks/${id}/duplicate`, { method: 'POST' });
+  reloadCurrentTab();
+}
+async function duplicateBucket(id) {
+  await api(`/api/bucket/${id}/duplicate`, { method: 'POST' });
+  loadBucket();
+  if (currentTab === 'monthly') loadMonthly();
+  if (currentTab === 'weekly')  loadWeekly();
+  if (currentTab === 'daily')   loadDaily();
+}
+async function duplicateSubitem(id) {
+  await api(`/api/subitems/${id}/duplicate`, { method: 'POST' });
+  loadBucket();
+  reloadCurrentTab();
+}
+
 async function toggleSubitemDaily(id) {
   const u = await _toggleSubitem(id);
   if (u && u.completed) showSubitemTimeModal(id); else { loadBucket(); loadDaily(); }
@@ -505,6 +526,7 @@ function taskItemHtml(t) {
       ${completedDateHtml}
       ${timeHtml}
     </div>
+    <button class="dup-btn" onclick="event.stopPropagation();duplicateTask(${t.id})" title="複製">⊕</button>
     <span class="edit-arrow" onclick="openEditTask(${t.id})">›</span>
   </div>`;
 }
