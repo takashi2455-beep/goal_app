@@ -510,7 +510,15 @@ function renderTasks(listId, tasks) {
 
 function taskItemHtml(t) {
   taskMap.set(t.id, t);
-  const roll = t.rolled_over_from ? '<span class="badge badge-roll">繰越</span>' : '';
+  const roll       = t.rolled_over_from ? '<span class="badge badge-roll">繰越</span>' : '';
+  const monthBadge = t.target_month && currentTab !== 'monthly'
+    ? `<span class="sub-month-label">${t.target_month}</span>` : '';
+  const weekBadge  = t.target_week && currentTab !== 'weekly'
+    ? `<span class="sub-week-label">${t.target_week}</span>` : '';
+  const dateBadge  = t.target_date && currentTab !== 'daily'
+    ? `<span class="sub-date-label">${t.target_date}</span>` : '';
+  const deadlineBadges = (monthBadge || weekBadge || dateBadge)
+    ? `<div class="task-deadline-badges">${monthBadge}${weekBadge}${dateBadge}</div>` : '';
   const completedDateHtml = t.completed && t.completed_at
     ? `<div class="task-sub">✓ 完了: ${t.completed_at.slice(0, 10)}</div>` : '';
   const timeHtml = t.completed
@@ -523,8 +531,7 @@ function taskItemHtml(t) {
     <div class="chk${t.completed ? ' on' : ''}" onclick="toggleTask(${t.id})"></div>
     <div class="task-body" onclick="openEditTask(${t.id})">
       <div class="task-title-text${t.completed ? ' done' : ''}">${esc(t.title)}${roll}</div>
-      ${completedDateHtml}
-      ${timeHtml}
+      ${deadlineBadges}${completedDateHtml}${timeHtml}
     </div>
     <button class="dup-btn" onclick="event.stopPropagation();duplicateTask(${t.id})" title="複製">⧉</button>
     <span class="edit-arrow" onclick="openEditTask(${t.id})">›</span>
@@ -736,9 +743,18 @@ async function saveAdd() {
   }
 
   const body = { title, task_type: currentTab };
-  if (currentTab === 'monthly') body.target_month = fmtMonth(currentMonth);
-  if (currentTab === 'weekly')  body.target_week  = fmtWeek(currentWeek);
-  if (currentTab === 'daily')   body.target_date  = fmtDate(currentDate);
+  if (currentTab === 'monthly') {
+    body.target_month = fmtMonth(currentMonth);
+  }
+  if (currentTab === 'weekly') {
+    body.target_week  = fmtWeek(currentWeek);
+    body.target_month = fmtMonth(currentWeek);
+  }
+  if (currentTab === 'daily') {
+    body.target_date  = fmtDate(currentDate);
+    body.target_week  = fmtWeek(currentDate);
+    body.target_month = fmtMonth(currentDate);
+  }
   await api('/api/tasks', { method: 'POST', body: JSON.stringify(body) });
   closeAddModal(); reloadCurrentTab();
 }

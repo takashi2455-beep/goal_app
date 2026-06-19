@@ -605,6 +605,13 @@ body {
 }
 .subitem-title.done { text-decoration: line-through; color: var(--text-muted); }
 
+.task-deadline-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 3px;
+}
+
 .sub-month-label {
   font-size: 11px;
   background: #F3E8FF;

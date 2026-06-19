@@ -209,9 +209,12 @@ def do_catchup(today=None):
         today = date.today().isoformat()
     conn = get_db()
     try:
+        today_dt    = datetime.strptime(today, '%Y-%m-%d')
+        today_week  = today_dt.strftime('%G-W%V')
+        today_month = today_dt.strftime('%Y-%m')
         t_count = conn.execute(
-            "UPDATE tasks SET target_date=? WHERE task_type='daily' AND target_date<? AND completed=0",
-            (today, today)
+            "UPDATE tasks SET target_date=?, target_week=?, target_month=? WHERE target_date<? AND target_date IS NOT NULL AND completed=0",
+            (today, today_week, today_month, today)
         ).rowcount
         s_count = conn.execute(
             "UPDATE bucket_subitems SET deadline_date=? "
@@ -417,7 +420,7 @@ def monthly_combined():
     conn = get_db()
 
     tasks = conn.execute(
-        "SELECT * FROM tasks WHERE task_type='monthly' AND target_month=? ORDER BY completed ASC, created_at ASC",
+        "SELECT * FROM tasks WHERE target_month=? ORDER BY completed ASC, created_at ASC",
         (month,)
     ).fetchall()
 
@@ -468,7 +471,7 @@ def weekly_combined():
     conn = get_db()
 
     tasks = conn.execute(
-        "SELECT * FROM tasks WHERE task_type='weekly' AND target_week=? ORDER BY completed ASC, created_at ASC",
+        "SELECT * FROM tasks WHERE target_week=? ORDER BY completed ASC, created_at ASC",
         (week,)
     ).fetchall()
 
@@ -515,7 +518,7 @@ def daily_combined():
     conn = get_db()
 
     tasks = conn.execute(
-        "SELECT * FROM tasks WHERE task_type='daily' AND target_date=? ORDER BY completed ASC, created_at ASC",
+        "SELECT * FROM tasks WHERE target_date=? ORDER BY completed ASC, created_at ASC",
         (day,)
     ).fetchall()
 
