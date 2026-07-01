@@ -8,6 +8,8 @@ let currentWeek  = new Date();
 let editId   = null;
 let editKind = null;
 
+const LIFE_LEVEL_LABELS = ['', '人生の大きな目標', '達成に必要なこと', '今年やること'];
+
 const expandedIds   = new Set();
 const subitemsMap   = new Map();   // subitem id → raw data
 const bucketItemMap = new Map();   // bucket  id → raw data
@@ -813,7 +815,6 @@ function renderLife(goals) {
       roots.push(map.get(g.id));
   });
 
-  const LABELS   = ['', '人生の大きな目標', '達成に必要なこと', '今年やること'];
   const ADD_LABELS = ['', '必要なことを追加', '今年やることを追加', ''];
 
   function renderNode(node) {
@@ -847,8 +848,7 @@ function openLifeModal(level, parentId) {
   lifeGoalLevel    = level;
   lifeGoalParentId = parentId ?? null;
   lifeGoalEditId   = null;
-  const labels = ['', '人生の大きな目標', '達成に必要なこと', '今年やること'];
-  document.getElementById('life-modal-title').textContent = `${labels[level]}を追加`;
+  document.getElementById('life-modal-title').textContent = `${LIFE_LEVEL_LABELS[level]}を追加`;
   document.getElementById('life-inp-title').value = '';
   document.getElementById('life-inp-desc').value  = '';
   document.getElementById('life-delete-btn').classList.add('hidden');
@@ -862,8 +862,7 @@ function openLifeEditModal(id) {
   lifeGoalEditId   = id;
   lifeGoalLevel    = goal.level;
   lifeGoalParentId = goal.parent_id;
-  const labels = ['', '人生の大きな目標', '達成に必要なこと', '今年やること'];
-  document.getElementById('life-modal-title').textContent = `${labels[goal.level]}を編集`;
+  document.getElementById('life-modal-title').textContent = `${LIFE_LEVEL_LABELS[goal.level]}を編集`;
   document.getElementById('life-inp-title').value = goal.title;
   document.getElementById('life-inp-desc').value  = goal.description || '';
   document.getElementById('life-delete-btn').classList.remove('hidden');
