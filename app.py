@@ -104,6 +104,16 @@ def init_db():
             completed INTEGER DEFAULT 0,
             created_at TEXT DEFAULT (datetime('now', 'localtime'))
         );
+
+        CREATE TABLE IF NOT EXISTS life_goals (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            parent_id INTEGER,
+            title TEXT NOT NULL,
+            description TEXT DEFAULT '',
+            level INTEGER DEFAULT 1,
+            completed INTEGER DEFAULT 0,
+            created_at TEXT DEFAULT (datetime('now', 'localtime'))
+        );
     ''')
     # Migration: add new columns to existing databases
     for col, defn in [
@@ -967,6 +977,69 @@ startup_catchup()
 scheduler = BackgroundScheduler()
 scheduler.add_job(do_catchup, 'cron', hour=0, minute=0)
 scheduler.start()
+
+# ── Life Goals ───────────────────────────────────────────────────────────────
+@app.route('/api/life-goals', methods=['GET'])
+def get_life_goals():
+    conn = get_db()
+    goals = conn.execute(
+        "SELECT * FROM life_goals ORDER BY level, parent_id, created_at"
+    ).fetchall()
+    conn.close()
+    return jsonify([dict(g) for g in goals])
+
+
+@app.route('/api/life-goals', methods=['POST'])
+def add_life_goal():
+    data = request.json
+    conn = get_db()
+    cur = conn.execute(
+        "INSERT INTO life_goals (parent_id, title, description, level) VALUES (?, ?, ?, ?)",
+        (data.get('parent_id'), data['title'], data.get('description', ''), data.get('level', 1))
+    )
+    conn.commit()
+    goal = conn.execute("SELECT * FROM life_goals WHERE id=?", (cur.lastrowid,)).fetchone()
+    conn.close()
+    return jsonify(dict(goal)), 201
+
+
+@app.route('/api/life-goals/<int:gid>', methods=['PUT'])
+def update_life_goal(gid):
+    data = request.json
+    conn = get_db()
+    conn.execute(
+        "UPDATE life_goals SET title=?, description=? WHERE id=?",
+        (data['title'], data.get('description', ''), gid)
+    )
+    conn.commit()
+    goal = conn.execute("SELECT * FROM life_goals WHERE id=?", (gid,)).fetchone()
+    conn.close()
+    return jsonify(dict(goal))
+
+
+@app.route('/api/life-goals/<int:gid>', methods=['DELETE'])
+def delete_life_goal(gid):
+    conn = get_db()
+    def _del(node_id):
+        children = conn.execute("SELECT id FROM life_goals WHERE parent_id=?", (node_id,)).fetchall()
+        for c in children:
+            _del(c['id'])
+        conn.execute("DELETE FROM life_goals WHERE id=?", (node_id,))
+    _del(gid)
+    conn.commit()
+    conn.close()
+    return jsonify({'ok': True})
+
+
+@app.route('/api/life-goals/<int:gid>/toggle', methods=['PATCH'])
+def toggle_life_goal(gid):
+    conn = get_db()
+    conn.execute("UPDATE life_goals SET completed = 1 - completed WHERE id=?", (gid,))
+    conn.commit()
+    goal = conn.execute("SELECT * FROM life_goals WHERE id=?", (gid,)).fetchone()
+    conn.close()
+    return jsonify(dict(goal))
+
 
 if __name__ == '__main__':
 

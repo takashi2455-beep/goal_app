@@ -750,3 +750,107 @@ body {
 
 /* Hidden utility */
 .hidden { display: none !important; }
+
+/* ── Life Goals ──────────────────────────────────────────────── */
+.life-header { padding: 10px 16px 0; }
+.life-header-row { display: flex; align-items: center; gap: 8px; }
+.life-legend { display: flex; gap: 6px; flex-wrap: wrap; }
+.life-legend-l1, .life-legend-l2, .life-legend-l3 {
+  font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 10px;
+}
+.life-legend-l1 { background: #DBEAFE; color: #1D4ED8; }
+.life-legend-l2 { background: #EDE9FE; color: #6D28D9; }
+.life-legend-l3 { background: #FEF3C7; color: #92400E; }
+
+/* Goal cards */
+.life-goal-l1, .life-goal-l2, .life-goal-l3 {
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  transition: opacity 0.2s;
+}
+.life-goal-l1 {
+  background: #EFF6FF;
+  border-left: 4px solid #2563EB;
+}
+.life-goal-l2 {
+  background: #F5F3FF;
+  border-left: 3px solid #7C3AED;
+  margin-left: 16px;
+}
+.life-goal-l3 {
+  background: #FFFBEB;
+  border-left: 3px solid #D97706;
+  margin-left: 32px;
+}
+.life-goal-l1.life-done, .life-goal-l2.life-done, .life-goal-l3.life-done {
+  opacity: 0.45;
+}
+
+/* Row layout */
+.life-goal-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Checkbox */
+.life-chk {
+  flex-shrink: 0;
+  width: 26px; height: 26px;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  background: var(--white);
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--success);
+  transition: border-color 0.15s, background 0.15s;
+}
+.life-chk:hover { border-color: var(--success); }
+.life-goal-l1.life-done .life-chk,
+.life-goal-l2.life-done .life-chk,
+.life-goal-l3.life-done .life-chk {
+  background: var(--success); border-color: var(--success); color: #fff;
+}
+
+/* Title */
+.life-title {
+  flex: 1;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  word-break: break-word;
+}
+.life-goal-l1 .life-title { font-size: 15px; }
+.life-goal-l3 .life-title { font-size: 13px; font-weight: 500; }
+.life-done .life-title { text-decoration: line-through; color: var(--text-muted); }
+
+/* Edit button */
+.life-edit-btn {
+  flex-shrink: 0;
+  background: none; border: none;
+  font-size: 18px; color: var(--text-muted);
+  cursor: pointer; padding: 2px 6px; border-radius: 6px;
+  line-height: 1;
+}
+.life-edit-btn:hover { background: var(--border); color: var(--text); }
+
+/* Description */
+.life-desc {
+  font-size: 12px; color: var(--text-muted);
+  margin-top: 4px; margin-left: 34px;
+  word-break: break-word;
+}
+
+/* Children container */
+.life-children { margin-top: 8px; }
+
+/* Add child button */
+.life-add-child {
+  margin-top: 8px; margin-left: 34px;
+  background: none; border: 1px dashed var(--border);
+  border-radius: 8px; padding: 4px 12px;
+  font-size: 12px; color: var(--text-muted);
+  cursor: pointer; transition: border-color 0.15s, color 0.15s;
+}
+.life-add-child:hover { border-color: var(--primary); color: var(--primary); }

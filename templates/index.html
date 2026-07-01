@@ -36,11 +36,28 @@
 
   <!-- Tabs -->
   <nav class="tabs">
+    <button class="tab" data-tab="life" onclick="switchTab('life')">人生</button>
     <button class="tab active" data-tab="bucket" onclick="switchTab('bucket')">やりたいこと</button>
     <button class="tab" data-tab="monthly" onclick="switchTab('monthly')">月</button>
     <button class="tab" data-tab="weekly" onclick="switchTab('weekly')">週</button>
     <button class="tab" data-tab="daily" onclick="switchTab('daily')">日</button>
   </nav>
+
+  <!-- 人生の目標 -->
+  <div id="tab-life" class="tab-content">
+    <div class="life-header">
+      <div class="life-header-row">
+        <div class="life-legend">
+          <span class="life-legend-l1">大目標</span>
+          <span class="life-legend-l2">必要なこと</span>
+          <span class="life-legend-l3">今年やること</span>
+        </div>
+      </div>
+    </div>
+    <div class="list-wrap">
+      <div id="life-list" class="task-list"></div>
+    </div>
+  </div>
 
   <!-- やりたいことリスト -->
   <div id="tab-bucket" class="tab-content active">
@@ -197,6 +214,27 @@
       <div class="modal-footer">
         <button class="btn-secondary" onclick="closeTimeModal()">スキップ</button>
         <button class="btn-primary" onclick="saveTimeSpent()">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Life Goal Modal -->
+  <div id="life-overlay" class="overlay hidden" onclick="closeLifeModal()">
+    <div class="modal" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <h2 id="life-modal-title">目標を追加</h2>
+        <button class="btn-close" onclick="closeLifeModal()">&#10005;</button>
+      </div>
+      <div class="modal-body">
+        <input id="life-inp-title" type="text" placeholder="タイトル *" autocomplete="off">
+        <textarea id="life-inp-desc" placeholder="メモ（オプション）" rows="2"></textarea>
+      </div>
+      <div class="modal-footer">
+        <button id="life-delete-btn" class="btn-danger hidden" onclick="confirmDeleteLifeGoal()">削除</button>
+        <div style="margin-left:auto;display:flex;gap:8px">
+          <button class="btn-secondary" onclick="closeLifeModal()">キャンセル</button>
+          <button class="btn-primary" onclick="saveLifeGoal()">保存</button>
+        </div>
       </div>
     </div>
   </div>

@@ -12,12 +12,16 @@ const expandedIds   = new Set();
 const subitemsMap   = new Map();   // subitem id → raw data
 const bucketItemMap = new Map();   // bucket  id → raw data
 const taskMap       = new Map();   // task    id → raw data
+const lifeGoalsMap  = new Map();   // life goal id → raw data
 
-let subitemBucketId = null;
-let subitemEditId   = null;
-let subitemParentId = null;
-let pendingTimeKind = null;
-let pendingTimeId   = null;
+let subitemBucketId  = null;
+let subitemEditId    = null;
+let subitemParentId  = null;
+let pendingTimeKind  = null;
+let pendingTimeId    = null;
+let lifeGoalEditId   = null;
+let lifeGoalParentId = null;
+let lifeGoalLevel    = 1;
 
 // ── Init ─────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
@@ -29,12 +33,13 @@ document.addEventListener('DOMContentLoaded', () => {
       document.getElementById('export-menu').classList.add('hidden');
   });
   document.addEventListener('keydown', e => {
-    if (e.key === 'Escape') { closeAddModal(); closeEditModal(); closeSubitemModal(); closeTimeModal(); }
+    if (e.key === 'Escape') { closeAddModal(); closeEditModal(); closeSubitemModal(); closeTimeModal(); closeLifeModal(); }
     if (e.key === 'Enter' && !e.shiftKey) {
       if (!document.getElementById('add-overlay').classList.contains('hidden'))     saveAdd();
       if (!document.getElementById('edit-overlay').classList.contains('hidden'))    saveEdit();
       if (!document.getElementById('subitem-overlay').classList.contains('hidden')) saveSubitem();
       if (!document.getElementById('time-overlay').classList.contains('hidden'))    saveTimeSpent();
+      if (!document.getElementById('life-overlay').classList.contains('hidden'))    saveLifeGoal();
     }
   });
 });
@@ -44,6 +49,7 @@ function switchTab(tab) {
   currentTab = tab;
   document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
   document.querySelectorAll('.tab-content').forEach(c => c.classList.toggle('active', c.id === `tab-${tab}`));
+  if (tab === 'life')    loadLife();
   if (tab === 'bucket')  loadBucket();
   if (tab === 'monthly') loadMonthly();
   if (tab === 'weekly')  loadWeekly();
@@ -554,6 +560,7 @@ function setBucketFieldsVisible(prefix, visible) {
 }
 
 function showAddModal() {
+  if (currentTab === 'life') { openLifeModal(1, null); return; }
   const isBucket = currentTab === 'bucket';
   document.getElementById('add-title').textContent =
     isBucket ? 'やりたいこと追加' :
@@ -780,6 +787,118 @@ async function confirmDeleteSubitem() {
   if (!confirm('このサブ項目を削除しますか？')) return;
   await api(`/api/subitems/${subitemEditId}`, { method: 'DELETE' });
   closeSubitemModal(); reloadAll();
+}
+
+// ── Life Goals ───────────────────────────────────────────────────────────────
+async function loadLife() {
+  const goals = await api('/api/life-goals');
+  lifeGoalsMap.clear();
+  goals.forEach(g => lifeGoalsMap.set(g.id, g));
+  renderLife(goals);
+}
+
+function renderLife(goals) {
+  const el = document.getElementById('life-list');
+  if (!goals || goals.length === 0) {
+    el.innerHTML = emptyState('🌟', '人生の目標をまだ登録していません');
+    return;
+  }
+  const map = new Map();
+  const roots = [];
+  goals.forEach(g => map.set(g.id, { ...g, children: [] }));
+  goals.forEach(g => {
+    if (g.parent_id && map.has(g.parent_id))
+      map.get(g.parent_id).children.push(map.get(g.id));
+    else
+      roots.push(map.get(g.id));
+  });
+
+  const LABELS   = ['', '人生の大きな目標', '達成に必要なこと', '今年やること'];
+  const ADD_LABELS = ['', '必要なことを追加', '今年やることを追加', ''];
+
+  function renderNode(node) {
+    const doneClass = node.completed ? ' life-done' : '';
+    const checkSvg = node.completed
+      ? `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>`
+      : '';
+    let childrenHtml = node.children.length
+      ? `<div class="life-children">${node.children.map(renderNode).join('')}</div>`
+      : '';
+    const addChildBtn = node.level < 3
+      ? `<button class="life-add-child" onclick="event.stopPropagation();openLifeModal(${node.level+1},${node.id})">＋ ${ADD_LABELS[node.level]}</button>`
+      : '';
+    return `
+      <div class="life-goal-l${node.level}${doneClass}">
+        <div class="life-goal-row">
+          <button class="life-chk" onclick="event.stopPropagation();toggleLifeGoal(${node.id})">${checkSvg}</button>
+          <span class="life-title">${esc(node.title)}</span>
+          <button class="life-edit-btn" onclick="event.stopPropagation();openLifeEditModal(${node.id})">…</button>
+        </div>
+        ${node.description ? `<p class="life-desc">${esc(node.description)}</p>` : ''}
+        ${childrenHtml}
+        ${addChildBtn}
+      </div>`;
+  }
+
+  el.innerHTML = roots.map(renderNode).join('');
+}
+
+function openLifeModal(level, parentId) {
+  lifeGoalLevel    = level;
+  lifeGoalParentId = parentId ?? null;
+  lifeGoalEditId   = null;
+  const labels = ['', '人生の大きな目標', '達成に必要なこと', '今年やること'];
+  document.getElementById('life-modal-title').textContent = `${labels[level]}を追加`;
+  document.getElementById('life-inp-title').value = '';
+  document.getElementById('life-inp-desc').value  = '';
+  document.getElementById('life-delete-btn').classList.add('hidden');
+  document.getElementById('life-overlay').classList.remove('hidden');
+  setTimeout(() => document.getElementById('life-inp-title').focus(), 50);
+}
+
+function openLifeEditModal(id) {
+  const goal = lifeGoalsMap.get(id);
+  if (!goal) return;
+  lifeGoalEditId   = id;
+  lifeGoalLevel    = goal.level;
+  lifeGoalParentId = goal.parent_id;
+  const labels = ['', '人生の大きな目標', '達成に必要なこと', '今年やること'];
+  document.getElementById('life-modal-title').textContent = `${labels[goal.level]}を編集`;
+  document.getElementById('life-inp-title').value = goal.title;
+  document.getElementById('life-inp-desc').value  = goal.description || '';
+  document.getElementById('life-delete-btn').classList.remove('hidden');
+  document.getElementById('life-overlay').classList.remove('hidden');
+  setTimeout(() => document.getElementById('life-inp-title').focus(), 50);
+}
+
+function closeLifeModal() {
+  document.getElementById('life-overlay').classList.add('hidden');
+  lifeGoalEditId = lifeGoalParentId = null;
+}
+
+async function saveLifeGoal() {
+  const title = document.getElementById('life-inp-title').value.trim();
+  if (!title) { document.getElementById('life-inp-title').focus(); return; }
+  const desc = document.getElementById('life-inp-desc').value.trim();
+  if (lifeGoalEditId != null) {
+    await api(`/api/life-goals/${lifeGoalEditId}`, { method: 'PUT', body: JSON.stringify({ title, description: desc }) });
+  } else {
+    await api('/api/life-goals', { method: 'POST', body: JSON.stringify({ title, description: desc, level: lifeGoalLevel, parent_id: lifeGoalParentId }) });
+  }
+  closeLifeModal();
+  loadLife();
+}
+
+async function toggleLifeGoal(id) {
+  await api(`/api/life-goals/${id}/toggle`, { method: 'PATCH' });
+  loadLife();
+}
+
+async function confirmDeleteLifeGoal() {
+  if (!confirm('この項目とその子項目をすべて削除しますか？')) return;
+  await api(`/api/life-goals/${lifeGoalEditId}`, { method: 'DELETE' });
+  closeLifeModal();
+  loadLife();
 }
 
 // ── Export ───────────────────────────────────────────────────────────────────
