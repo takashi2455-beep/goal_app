@@ -1,5 +1,8 @@
 'use strict';
 
+// Auto-detect API prefix for standalone (/api/...) vs portal (/goal/api/...)
+const API_BASE = window.location.pathname.startsWith('/goal') ? '/goal' : '';
+
 // ── State ────────────────────────────────────────────────────────────────────
 let currentTab   = 'bucket';
 let currentDate  = new Date();
@@ -111,7 +114,7 @@ function changeDay(delta) {
 
 // ── API ──────────────────────────────────────────────────────────────────────
 async function api(url, opts = {}) {
-  const res = await fetch(url, { headers: { 'Content-Type': 'application/json' }, ...opts });
+  const res = await fetch(API_BASE + url, { headers: { 'Content-Type': 'application/json' }, ...opts });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();
 }
@@ -903,6 +906,6 @@ async function confirmDeleteLifeGoal() {
 // ── Export ───────────────────────────────────────────────────────────────────
 function toggleExportMenu() { document.getElementById('export-menu').classList.toggle('hidden'); }
 function exportFile(type) {
-  window.location.href = `/api/export/${type}`;
+  window.location.href = `${API_BASE}/api/export/${type}`;
   document.getElementById('export-menu').classList.add('hidden');
 }
